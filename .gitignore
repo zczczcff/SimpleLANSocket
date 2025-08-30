@@ -1,0 +1,113 @@
+# Visual Studio 2019 + CMake 混合忽略规则
+
+*.vcxproj
+*.filters
+
+### 构建系统生成 ###
+## CMake 生成文件 ##
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+#*.cmake
+#*.cmake.*
+CTestTestfile.cmake
+
+## 构建目录 ##
+[Bb]uild*/
+[Oo]ut*/
+[Dd]ebug*/
+[Rr]elease*/
+[Xx]64/
+[Xx]86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+_CPack_Packages/
+bld/
+
+## Makefile 相关 ##
+Makefile
+GNUmakefile
+*.ninja
+.ninja_deps
+.ninja_log
+build.ninja
+
+### 可执行文件 & 库 ###
+*.exe
+*.dll
+*.so
+*.dylib
+*.app
+*.lib
+*.a
+*.bin
+*.exp
+*.pdb
+*.ilk
+*.idb
+*.ipdb
+*.iobj
+
+### 开发环境 ###
+## IDE 配置文件 ##
+.vs/
+.vscode/
+.idea/
+*.code-workspace
+*.sln
+*.vcxproj*
+*.filters
+*.vc.db
+*.VC.VC.opendb
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## 预编译头 ##
+*.pch
+*.ipch
+
+### 中间文件 ###
+*.obj
+*.tlog
+*.log
+*.cache
+*.cachefile
+*.unsuccessfulbuild
+*.idb
+*.pdb
+*.res
+*.map
+*.db
+*.manifest
+*.metagen
+*.meta
+*.aps
+*.ncb
+*.opensdf
+*.sdf
+
+### 资源文件 ###
+/Resource/
+imgui.ini
+###三方库###
+/ThirdParty/
+
+
+### 系统文件 ###
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+*~
+*.swp
+*.swo
+
+### 其他生成文件 ###
+*.autosave
+compile_commands.json
