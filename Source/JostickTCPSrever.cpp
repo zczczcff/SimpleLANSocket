@@ -1,11 +1,11 @@
-// JostickTCPServer.cpp
 #include "JostickTCPServer.h"
 #include "JTCPProtocol.h"
+#include <cstring> // 添加用于字符串操作的头文件
 
 // --- JostickTcpSession 实现 ---
 JostickTcpSession::JostickTcpSession(JostickTcpServer* server, int socket,
     JostickTcpServer::ClientID clientId)
-    : server_(server), socket_(socket), client_id_(clientId) {
+    : server_(server), socket_(socket), client_id_(clientId) { // 使用IP地址作为标识
 
     // 初始化协议对象
     auto sender = [this](const uint8_t* data, size_t len) -> int {
@@ -36,7 +36,7 @@ JostickTcpSession::JostickTcpSession(JostickTcpServer* server, int socket,
                 // 文件进度回调
                 if (server_->on_file_progress_) {
                     server_->on_file_progress_(
-                        client_id_,
+                        client_id_, // 使用IP地址
                         file_data->getFileId(),
                         file_data->getChunkIndex() + 1,
                         file_data->getTotalChunks()
@@ -91,6 +91,7 @@ void JostickTcpSession::Stop() {
     socket_ = -1;
 }
 
+
 bool JostickTcpSession::SendMessage(const std::string& message) {
     if (!connected_) return false;
 
@@ -102,8 +103,10 @@ bool JostickTcpSession::SendMessage(const std::string& message) {
     return true;
 }
 
-void JostickTcpSession::WorkerThread() {
-    while (running_) {
+void JostickTcpSession::WorkerThread() 
+{
+    while (running_) 
+    {
         // 1. 处理接收
         char buffer[1024];
         int bytes_received = recv(socket_, buffer, sizeof(buffer), 0);
@@ -113,34 +116,33 @@ void JostickTcpSession::WorkerThread() {
                 reinterpret_cast<uint8_t*>(buffer),
                 bytes_received
             );
-            ProcessReceivedData();
         }
         else if (bytes_received == 0) {
             // 连接断开
             connected_ = false;
             server_->AddEvent({
                 JostickTcpServer::ServerEvent::Type::DISCONNECT,
-                client_id_
+                client_id_ // 使用IP地址
                 });
             break;
         }
-        else 
+        else
         {
 #ifdef _WIN32
-			if (WSAGetLastError() != WSAEWOULDBLOCK) {
-				connected_ = false;
-				server_->AddEvent({
-					JostickTcpServer::ServerEvent::Type::DISCONNECT,
-					client_id_
-					});
-				break;
-			}
+            if (WSAGetLastError() != WSAEWOULDBLOCK) {
+                connected_ = false;
+                server_->AddEvent({
+                    JostickTcpServer::ServerEvent::Type::DISCONNECT,
+                    client_id_ // 使用IP地址
+                    });
+                break;
+            }
 #else
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 connected_ = false;
                 server_->AddEvent({
-                    ServerEvent::Type::DISCONNECT,
-                    client_id_
+                    JostickTcpServer::ServerEvent::Type::DISCONNECT,
+                    client_id_ // 使用IP地址
                     });
                 break;
             }
@@ -148,14 +150,19 @@ void JostickTcpSession::WorkerThread() {
         }
 
         // 2. 处理发送
+        ProcessReceivedData();
         ProcessSending();
+        //3.协议工作循环
+        protocol_->WorkTick();
 
-        // 3. 短暂休眠
+        // 4. 短暂休眠
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
 
-void JostickTcpSession::ProcessReceivedData() {
+void JostickTcpSession::ProcessReceivedData() 
+{
+    
     std::queue<ReceivedData> process_queue;
     {
         std::lock_guard<std::mutex> lock(recv_mutex_);
@@ -169,14 +176,14 @@ void JostickTcpSession::ProcessReceivedData() {
         case ReceivedData::Type::MESSAGE:
             server_->AddEvent({
                 JostickTcpServer::ServerEvent::Type::MESSAGE,
-                client_id_,
+                client_id_, // 使用IP地址
                 data.message
                 });
             break;
         case ReceivedData::Type::FILE:
             server_->AddEvent({
                 JostickTcpServer::ServerEvent::Type::FILE,
-                client_id_,
+                client_id_, // 使用IP地址
                 "",
                 data.fileId,
                 data.fileData
@@ -256,6 +263,13 @@ JostickTcpServer::~JostickTcpServer() {
     delete event_buffers[1];
 }
 
+// 获取客户端IP地址的辅助函数
+std::string JostickTcpServer::GetClientIP(sockaddr_in& client_addr) {
+    char ipStr[INET_ADDRSTRLEN];
+    const char* result = inet_ntop(AF_INET, &client_addr.sin_addr, ipStr, sizeof(ipStr));
+    return (result != nullptr) ? std::string(ipStr) : "0.0.0.0";
+}
+
 bool JostickTcpServer::Start(int worker_threads) {
     if (running_) return false;
 
@@ -323,7 +337,7 @@ void JostickTcpServer::Stop() {
         // 关闭所有客户端会话
         {
             std::lock_guard<std::mutex> lock(sessions_mutex_);
-            for (auto& [id, session] : sessions_) {
+            for (auto& [ip, session] : sessions_) {
                 session->Stop();
             }
             sessions_.clear();
@@ -350,7 +364,8 @@ void JostickTcpServer::Stop() {
     }
 }
 
-void JostickTcpServer::Tick() {
+void JostickTcpServer::Tick() 
+{
     // 交换事件缓冲
     std::queue<ServerEvent>* event_swap = nullptr;
     {
@@ -367,22 +382,22 @@ void JostickTcpServer::Tick() {
         switch (event.type) {
         case ServerEvent::Type::MESSAGE:
             if (on_message_) {
-                on_message_(event.clientId, event.message);
+                on_message_(event.clientId, event.message); // 使用IP地址
             }
             break;
         case ServerEvent::Type::FILE:
             if (on_file_) {
-                on_file_(event.clientId, event.fileId, event.fileData);
+                on_file_(event.clientId, event.fileId, event.fileData); // 使用IP地址
             }
             break;
         case ServerEvent::Type::CONNECT:
             if (on_new_connection_) {
-                on_new_connection_(event.clientId);
+                on_new_connection_(event.clientId); // 使用IP地址
             }
             break;
         case ServerEvent::Type::DISCONNECT:
             if (on_disconnect_) {
-                on_disconnect_(event.clientId);
+                on_disconnect_(event.clientId); // 使用IP地址
             }
             break;
         }
@@ -420,13 +435,30 @@ void JostickTcpServer::AcceptThread() {
         // 设置新socket为非阻塞
         SetNonBlocking(client_socket);
 
+        // 获取客户端IP地址作为标识
+        std::string clientIp = GetClientIP(client_addr);
+
+        // 一个IP只允许一个连接：如果已存在，先断开旧连接
+        std::shared_ptr<JostickTcpSession> old_session;
+        {
+            std::lock_guard<std::mutex> lock(sessions_mutex_);
+            auto it = sessions_.find(clientIp);
+            if (it != sessions_.end()) {
+                old_session = it->second;
+                sessions_.erase(it);
+            }
+        }
+
+        if (old_session) {
+            old_session->Stop(); // 停止旧会话
+        }
+
         // 创建新会话
-        ClientID clientId = next_client_id_++;
-        auto session = std::make_shared<JostickTcpSession>(this, client_socket, clientId);
+        auto session = std::make_shared<JostickTcpSession>(this, client_socket, clientIp);
 
         {
             std::lock_guard<std::mutex> lock(sessions_mutex_);
-            sessions_[clientId] = session;
+            sessions_[clientIp] = session;
         }
 
         // 启动会话
@@ -435,7 +467,7 @@ void JostickTcpServer::AcceptThread() {
         // 添加连接事件
         AddEvent({
             ServerEvent::Type::CONNECT,
-            clientId
+            clientIp // 使用IP地址
             });
     }
 }
@@ -446,15 +478,15 @@ void JostickTcpServer::WorkerThread() {
         std::vector<ClientID> to_remove;
         {
             std::lock_guard<std::mutex> lock(sessions_mutex_);
-            for (auto& [id, session] : sessions_) {
+            for (auto& [ip, session] : sessions_) {
                 if (!session->IsConnected()) {
-                    to_remove.push_back(id);
+                    to_remove.push_back(ip);
                 }
             }
         }
 
-        for (auto id : to_remove) {
-            DisconnectClient(id);
+        for (auto ip : to_remove) {
+            DisconnectClient(ip);
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -478,7 +510,7 @@ void JostickTcpServer::SendToClient(ClientID clientId, const std::string& messag
 
 void JostickTcpServer::Broadcast(const std::string& message) {
     std::lock_guard<std::mutex> lock(sessions_mutex_);
-    for (auto& [id, session] : sessions_) {
+    for (auto& [ip, session] : sessions_) {
         if (session->IsConnected()) {
             session->SendMessage(message);
         }
@@ -500,7 +532,7 @@ void JostickTcpServer::DisconnectClient(ClientID clientId) {
         session->Stop();
         AddEvent({
             ServerEvent::Type::DISCONNECT,
-            clientId
+            clientId // 使用IP地址
             });
     }
 }

@@ -89,9 +89,54 @@ private:
     // 获取本机IP（跨平台）
     std::string GetLocalIP() 
     {
-        // 实现参考UDPServerDiscoverer的GetLocalIP()
-        // 此处省略具体实现（保持问题简洁）
-        return "192.168.1.100"; // 示例IP
+#ifdef _WIN32
+        char hostname[256];
+        if (gethostname(hostname, sizeof(hostname)))
+        {
+            return "";
+        }
+
+        struct hostent* host = gethostbyname(hostname);
+        if (!host) return "";
+
+        for (int i = 0; host->h_addr_list[i] != 0; ++i)
+        {
+            struct in_addr addr;
+            memcpy(&addr, host->h_addr_list[i], sizeof(struct in_addr));
+            std::string ip = inet_ntoa(addr);
+
+            // 排除回环地址
+            if (ip.substr(0, 3) != "127")
+            {
+                return ip;
+            }
+        }
+#else
+        struct ifaddrs* ifap;
+        if (getifaddrs(&ifap) != 0) return "";
+
+        for (struct ifaddrs* ifa = ifap; ifa; ifa = ifa->ifa_next) {
+            if (!ifa->ifa_addr) continue;
+
+            if (ifa->ifa_addr->sa_family == AF_INET) {
+                void* tmpAddr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
+                char ipBuf[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, tmpAddr, ipBuf, INET_ADDRSTRLEN);
+
+                // 排除回环地址和docker等虚拟接口
+                std::string ip(ipBuf);
+                if (ip != "127.0.0.1" &&
+                    std::string(ifa->ifa_name).find("lo") == std::string::npos &&
+                    std::string(ifa->ifa_name).find("docker") == std::string::npos)
+                {
+                    freeifaddrs(ifap);
+                    return ip;
+                }
+            }
+        }
+        freeifaddrs(ifap);
+#endif
+        return "";
     }
 
     void DiscoveryLoop() 

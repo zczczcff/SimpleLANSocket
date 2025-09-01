@@ -1,4 +1,3 @@
-// JostickTCPServer.h
 #pragma once
 
 #include <iostream>
@@ -12,6 +11,7 @@
 #include <functional>
 #include <queue>
 #include <condition_variable>
+#include <cstring> // 添加用于字符串操作的头文件
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -32,21 +32,23 @@ class JostickTcpSession;  // 前向声明
 class JostickTcpServer {
 public:
     friend class JostickTcpSession;
-    using ClientID = uint64_t;
+    using ClientID = std::string; // 修改为字符串类型
     using MessageCallback = std::function<void(ClientID clientId, const std::string& message)>;
     using FileCallback = std::function<void(ClientID clientId, uint32_t fileId, const std::vector<uint8_t>& fileData)>;
     using FileProgressCallback = std::function<void(ClientID clientId, uint32_t fileId, uint32_t currentChunk, uint32_t totalChunks)>;
     using NewConnectionCallback = std::function<void(ClientID clientId)>;
     using DisconnectCallback = std::function<void(ClientID clientId)>;
+
     // 双缓冲接收队列
-    struct ServerEvent 
+    struct ServerEvent
     {
         enum class Type { MESSAGE, FILE, CONNECT, DISCONNECT } type;
-        ClientID clientId;
+        ClientID clientId; // 类型已改为std::string
         std::string message;
         uint32_t fileId;
         std::vector<uint8_t> fileData;
     };
+
 private:
     // 服务器配置
     int listen_port_;
@@ -58,7 +60,7 @@ private:
 
     // 客户端管理
     std::atomic<bool> running_;
-    std::unordered_map<ClientID, std::shared_ptr<JostickTcpSession>> sessions_;
+    std::unordered_map<ClientID, std::shared_ptr<JostickTcpSession>> sessions_; // 键改为std::string
     std::mutex sessions_mutex_;
 
     // 线程控制
@@ -75,9 +77,6 @@ private:
     // 同步机制
     std::mutex event_mutex_;
     std::condition_variable cv_;
-
-    // 客户端ID计数器
-    std::atomic<ClientID> next_client_id_{ 1 };
 
 public:
     explicit JostickTcpServer(int port);
@@ -123,12 +122,15 @@ private:
 
     // 关闭socket
     void CloseSocket(int sock);
+
+    // 获取客户端IP地址
+    static std::string GetClientIP(sockaddr_in& client_addr);
 };
 
 // 客户端会话类
 class JostickTcpSession : public std::enable_shared_from_this<JostickTcpSession> {
 public:
-    
+
     using SendFunction = std::function<bool(uint8_t* data, uint16_t len)>;
 
     JostickTcpSession(JostickTcpServer* server, int socket, JostickTcpServer::ClientID clientId);
@@ -153,7 +155,7 @@ private:
     // 核心成员
     JostickTcpServer* server_;
     int socket_;
-    JostickTcpServer::ClientID client_id_;
+    JostickTcpServer::ClientID client_id_; // 类型已改为std::string
     std::atomic<bool> connected_{ false };
     std::atomic<bool> running_{ false };
 
