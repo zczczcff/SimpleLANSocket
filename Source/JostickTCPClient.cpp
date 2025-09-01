@@ -42,6 +42,12 @@ void JostickTcpClient::SendMsg(const std::string& msg)
     free_send_buffer->push(msg);
 }
 
+void JostickTcpClient::SendFile(const std::string& file_path)
+{
+    std::lock_guard<std::mutex> lock(file_send_mutex_);
+    file_send_queue_.push(file_path);
+}
+
 // 连接到服务器
 
 bool JostickTcpClient::Connect()
@@ -256,7 +262,8 @@ void JostickTcpClient::WorkerThread()
         protocol_->WorkTick();
 
         // 3. 处理发送队列
-        ProcessSending();
+        ProcessSendMsg();
+        ProcessSendFile();
 
         // 4. 检查连接状态
         if (was_connected && !IsSocketConnected()) {
@@ -271,7 +278,7 @@ void JostickTcpClient::WorkerThread()
 
 // 处理发送数据
 
-void JostickTcpClient::ProcessSending()
+void JostickTcpClient::ProcessSendMsg()
 {
     std::queue<std::string>* send_queue = nullptr;
     {
@@ -283,6 +290,24 @@ void JostickTcpClient::ProcessSending()
         auto& message = send_queue->front();
         protocol_->sendMessage(message);
         send_queue->pop();
+    }
+}
+
+void JostickTcpClient::ProcessSendFile()
+{
+    // 处理文件发送请求
+    std::unique_lock<std::mutex> file_lock(file_send_mutex_);
+    while (!file_send_queue_.empty()) {
+        auto file_path = file_send_queue_.front();
+        file_send_queue_.pop();
+
+        // 临时释放锁避免阻塞
+        file_lock.unlock();
+
+        // 调用协议层发送文件
+        protocol_->sendFile(file_path);
+
+        file_lock.lock();
     }
 }
 

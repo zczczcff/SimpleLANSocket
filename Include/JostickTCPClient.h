@@ -56,6 +56,10 @@ private:
     std::queue<std::string>* current_send_buffer;
     std::queue<std::string>* free_send_buffer;
 
+    // 文件发送队列
+    std::queue<std::string> file_send_queue_;
+    std::mutex file_send_mutex_;
+
     // 线程控制
     std::atomic<bool> running_;
     std::thread work_thread_;
@@ -93,6 +97,7 @@ public:
 
     // 发送文本消息
     void SendMsg(const std::string& msg);
+    void SendFile(const std::string& file_path);
 
     // 连接到服务器
     bool Connect();
@@ -114,7 +119,8 @@ private:
     void WorkerThread();
 
     // 处理发送数据
-    void ProcessSending();
+    void ProcessSendMsg();
+    void ProcessSendFile();
 
     // 检查socket连接状态
     bool IsSocketConnected() const;
