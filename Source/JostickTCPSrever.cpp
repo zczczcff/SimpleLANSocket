@@ -51,6 +51,7 @@ JostickTcpSession::JostickTcpSession(JostickTcpServer* server, int socket,
                         ReceivedData::Type::FILE,
                         "",
                         file_data->getFileId(),
+                        file_data->getFileName(),
                         file_data->getChunkData()
                         });
                 }
@@ -179,6 +180,7 @@ void JostickTcpSession::ProcessReceivedData() {
                 client_id_,
                 "",
                 data.fileId,
+                data.fileName,
                 data.fileData
                 });
             break;
@@ -372,7 +374,7 @@ void JostickTcpServer::Tick() {
             break;
         case ServerEvent::Type::FILE:
             if (on_file_) {
-                on_file_(event.clientId, event.fileId, event.fileData);
+                on_file_(event.clientId, event.fileId, event.fileName, event.fileData);
             }
             break;
         case ServerEvent::Type::CONNECT:

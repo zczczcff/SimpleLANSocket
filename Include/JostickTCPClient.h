@@ -29,7 +29,7 @@ class JostickTcpClient
 public:
     // 回调函数类型定义
     using MessageCallback = std::function<void(const std::string& message)>;
-    using FileCallback = std::function<void(uint32_t fileId, const std::vector<uint8_t>& fileData)>;
+    using FileCallback = std::function<void(uint32_t fileId, const std::string& fileName, const std::vector<uint8_t>& fileData)>;
     using FileProgressCallback = std::function<void(uint32_t fileId, uint32_t currentChunk, uint32_t totalChunks)>;
     using DisconnectCallback = std::function<void()>;
 
@@ -44,6 +44,7 @@ private:
         enum class Type { MESSAGE, FILE } type;
         std::string message;
         uint32_t fileId;
+        std::string fileName;
         std::vector<uint8_t> fileData;
     };
 

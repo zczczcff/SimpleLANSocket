@@ -3,6 +3,14 @@
 std::vector<uint8_t> FileChunkPacketData::serialize() const
 {
     std::vector<uint8_t> data;
+
+    // 序列化文件名（长度前缀 + 内容）
+    uint32_t name_len = static_cast<uint32_t>(file_name.size());
+    uint32_t net_name_len = htonl(name_len);
+    data.insert(data.end(),
+        reinterpret_cast<const uint8_t*>(&net_name_len),
+        reinterpret_cast<const uint8_t*>(&net_name_len) + sizeof(net_name_len));
+    data.insert(data.end(), file_name.begin(), file_name.end());
     // 添加文件ID
     uint32_t netFileId = htonl(file_id);
     data.insert(data.end(),
@@ -26,8 +34,17 @@ std::vector<uint8_t> FileChunkPacketData::serialize() const
 bool FileChunkPacketData::deserialize(const std::vector<uint8_t>& data)
 {
     if (data.size() < 12) return false; // 文件ID+块索引+总块数 = 12字节
-
     size_t offset = 0;
+
+    // 反序列化文件名
+    uint32_t net_name_len;
+    memcpy(&net_name_len, data.data() + offset, sizeof(net_name_len));
+    offset += sizeof(net_name_len);
+    uint32_t name_len = ntohl(net_name_len);
+
+    file_name.assign(data.begin() + offset, data.begin() + offset + name_len);
+    offset += name_len;
+
     // 读取文件ID
     memcpy(&file_id, data.data() + offset, sizeof(file_id));
     file_id = ntohl(file_id);
@@ -77,6 +94,12 @@ void JTCPProtocol::sendFile(const std::string& file_path, uint8_t priority)
         return;
     }
 
+    // 从路径中提取文件名
+    size_t pos = file_path.find_last_of("/\\");
+    std::string file_name = (pos != std::string::npos)
+        ? file_path.substr(pos + 1)
+        : file_path;
+
     std::lock_guard<std::mutex> lock(file_mutex);
     uint32_t file_id = next_file_id++;
 
@@ -96,9 +119,9 @@ void JTCPProtocol::sendFile(const std::string& file_path, uint8_t priority)
         file.read(reinterpret_cast<char*>(chunk_data.data()), chunk_size);
 
         auto packet_data = std::make_shared<FileChunkPacketData>(
-            file_id, i, total_chunks, chunk_data);
-
+            file_id, i, total_chunks, chunk_data, file_name);  // 添加文件名参数
         addPacketToQueue(packet_data, priority);
+
     }
 
     file.close();
@@ -166,6 +189,7 @@ void JTCPProtocol::ProcessReceivedData()
             auto chunk_data = std::make_shared<FileChunkPacketData>();
             if (chunk_data->deserialize(packet_data))
             {
+                std::string file_name = chunk_data->getFileName();
                 uint32_t file_id = chunk_data->getFileId();
                 uint32_t chunk_index = chunk_data->getChunkIndex();
                 uint32_t total_chunks = chunk_data->getTotalChunks();
@@ -174,7 +198,7 @@ void JTCPProtocol::ProcessReceivedData()
 
                 // 获取或创建重组状态
                 auto& reassembly = file_reassembly_map.try_emplace(
-                    file_id, file_id, total_chunks
+                    file_id, file_id, total_chunks, file_name  // 传入文件名
                 ).first->second;
 
                 // 检查块索引有效性
@@ -197,7 +221,7 @@ void JTCPProtocol::ProcessReceivedData()
                     // 组装完整文件
                     auto full_file_data = reassembly.assemble();
                     auto complete_file = std::make_shared<FileChunkPacketData>(
-                        file_id, 0, 1, full_file_data  // 用特殊索引0表示完整文件
+                        file_id, 0, 1, full_file_data, reassembly.file_name  // 传递文件名
                         );
 
                     // 触发回调

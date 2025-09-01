@@ -148,7 +148,7 @@ void JostickTcpClient::Tick()
             break;
         case ReceivedData::Type::FILE:
             if (on_file_) {
-                on_file_(data.fileId, data.fileData);
+                on_file_(data.fileId, data.fileName, data.fileData);
             }
             break;
         }
@@ -213,6 +213,7 @@ void JostickTcpClient::CreateProtocol()
                         ReceivedData::Type::FILE,
                         "",
                         file_data->getFileId(),
+                        file_data->getFileName(),
                         file_data->getChunkData()
                         });
                 }
