@@ -34,7 +34,7 @@ public:
     friend class JostickTcpSession;
     using ClientID = std::string; // 修改为字符串类型
     using MessageCallback = std::function<void(ClientID clientId, const std::string& message)>;
-    using FileCallback = std::function<void(ClientID clientId, uint32_t fileId, const std::vector<uint8_t>& fileData)>;
+    using FileCallback = std::function<void(ClientID clientId, uint32_t fileId, const std::string& fileName, const std::vector<uint8_t>& fileData)>;
     using FileProgressCallback = std::function<void(ClientID clientId, uint32_t fileId, uint32_t currentChunk, uint32_t totalChunks)>;
     using NewConnectionCallback = std::function<void(ClientID clientId)>;
     using DisconnectCallback = std::function<void(ClientID clientId)>;
@@ -46,6 +46,7 @@ public:
         ClientID clientId; // 类型已改为std::string
         std::string message;
         uint32_t fileId;
+        std::string fileName;
         std::vector<uint8_t> fileData;
     };
 
@@ -149,6 +150,7 @@ private:
         enum class Type { MESSAGE, FILE } type;
         std::string message;
         uint32_t fileId;
+        std::string fileName;
         std::vector<uint8_t> fileData;
     };
 

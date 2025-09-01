@@ -108,9 +108,14 @@ class FileChunkPacketData : public IPacketData
 public:
     FileChunkPacketData() = default;
     FileChunkPacketData(uint32_t fileId, uint32_t chunkIndex,
-        uint32_t totalChunks, const std::vector<uint8_t>& chunkData)
+        uint32_t totalChunks, const std::vector<uint8_t>& chunkData,
+        const std::string& fileName)  // 新增文件名参数
         : file_id(fileId), chunk_index(chunkIndex),
-        total_chunks(totalChunks), chunk_data(chunkData) {}
+        total_chunks(totalChunks), chunk_data(chunkData),
+        file_name(fileName) {}  // 存储文件名
+
+    // 获取文件名
+    const std::string& getFileName() const { return file_name; }
 
     PacketType getType() const override { return PacketType::FILE_CHUNK; }
 
@@ -128,6 +133,7 @@ private:
     uint32_t chunk_index;
     uint32_t total_chunks;
     std::vector<uint8_t> chunk_data;
+    std::string file_name;
 };
 
 // 待发送的包
@@ -157,9 +163,12 @@ private:
         uint32_t received_count = 0;
         std::vector<std::vector<uint8_t>> chunks;
         std::vector<bool> received_flags;
-
-        FileReassembly(uint32_t id, uint32_t total)
-            : file_id(id), total_chunks(total) {
+        std::string file_name;
+        FileReassembly(uint32_t id, uint32_t total, const std::string& file_name)
+            : file_id(id), 
+            total_chunks(total),
+            file_name(file_name)
+        {
             chunks.resize(total);
             received_flags.resize(total, false);
         }
